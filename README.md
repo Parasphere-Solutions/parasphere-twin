@@ -55,3 +55,10 @@ storage. Cleverness belongs in the consumer that needs it.
 uv sync --extra dev
 uv run pytest
 ```
+
+## License
+
+Apache-2.0. Maintained by [Parasphere Solutions](https://paraspheresolutions.com) —
+automated infrastructure inspection software. The schema is published openly
+so partners, agencies, and hardware vendors can read and write the same
+structure description we do.

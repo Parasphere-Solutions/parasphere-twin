@@ -3,10 +3,23 @@ name = "parasphere-twin"
 version = "0.1.0"
 description = "The shared structure-twin schema: one file drives simulation, mission planning, coverage, and processing"
 requires-python = ">=3.10"
+license = "Apache-2.0"
+authors = [{ name = "Parasphere Solutions" }]
+keywords = ["bridge", "inspection", "digital-twin", "hydrographic", "infrastructure"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering",
+]
+
 dependencies = ["pydantic>=2.7"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.6"]
+
+[project.urls]
+Homepage = "https://github.com/Parasphere-Solutions/parasphere-twin"
 
 [build-system]
 requires = ["hatchling"]
