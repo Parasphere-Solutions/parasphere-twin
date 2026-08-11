@@ -119,3 +119,88 @@ def test_legacy_twin_without_version_still_loads():
     payload = json.loads(dumps_twin(demo_twin()))
     payload.pop("schema_version")
     assert loads_twin(json.dumps(payload)).structure_id == "demo-two-pier"
+
+
+def _pier(**overrides) -> PierGeometry:
+    fields = {
+        "pier_id": "p", "x_ft": 0.0, "z_ft": 0.0, "length_ft": 4.0,
+        "width_ft": 8.0, "top_y_ft": 0.0, "bottom_y_ft": -63.0,
+    }
+    return PierGeometry(**{**fields, **overrides})
+
+
+def test_foundation_defaults_to_unknown():
+    """No twin is forced to claim a foundation it has no plans for."""
+    assert _pier().foundation_y_ft is None
+    assert all(p.foundation_y_ft is None for p in demo_twin().piers)
+
+
+def test_foundation_round_trips_when_stated():
+    twin = SubstructureTwin(
+        structure_id="founded", name="Founded case",
+        waterline_y_ft=0.0, streambed_y_ft=-63.0,
+        piers=(_pier(foundation_y_ft=-90.0),),
+    )
+    loaded = loads_twin(dumps_twin(twin))
+    assert loaded == twin
+    assert loaded.piers[0].foundation_y_ft == -90.0
+
+
+def test_foundation_above_the_streambed_is_accepted():
+    """An exposed foundation is the emergency, not an input error.
+
+    A foundation bottoming above the current streambed (and above the
+    pier's modeled bottom) is exactly the undermining this field exists
+    to expose; validation must never reject it as implausible.
+    """
+    twin = SubstructureTwin(
+        structure_id="undermined", name="Undermined case",
+        waterline_y_ft=0.0, streambed_y_ft=-63.0,
+        piers=(_pier(foundation_y_ft=-40.0),),  # above bed AND pier bottom
+    )
+    assert twin.piers[0].foundation_y_ft == -40.0
+
+
+def test_foundation_at_or_above_the_pier_top_is_rejected():
+    """The one geometric impossibility: structure cannot end above its top."""
+    with pytest.raises(ValidationError):
+        _pier(foundation_y_ft=0.0)  # equal to top_y_ft
+    with pytest.raises(ValidationError):
+        _pier(foundation_y_ft=5.0)  # above top_y_ft
+
+
+def test_a_non_finite_foundation_is_rejected_not_read_as_a_level():
+    """NaN, -inf, and +inf are all garbage sentinels, not levels.
+
+    -inf is the treacherous one: it satisfies `foundation < top`, then
+    serializes to null and round-trips as "no foundation on record".
+    """
+    for garbage in (float("nan"), float("-inf"), float("inf")):
+        with pytest.raises(ValidationError):
+            _pier(foundation_y_ft=garbage)
+
+
+def test_an_unknown_key_is_rejected_not_silently_dropped():
+    """A typo'd foundation must fail loudly, not read as 'not on record'."""
+    import json
+
+    with pytest.raises(ValidationError):
+        _pier(fondation_y_ft=-90.0)  # the typo that must never validate
+    payload = json.loads(dumps_twin(demo_twin()))
+    payload["waterline"] = 0.0  # not a schema field
+    with pytest.raises(ValidationError):
+        loads_twin(json.dumps(payload))
+
+
+def test_schema_1_0_twins_still_load():
+    """The foundation field is additive: pre-1.1 files keep loading."""
+    import json
+
+    assert SCHEMA_VERSION == "1.1"
+    payload = json.loads(dumps_twin(demo_twin()))
+    payload["schema_version"] = "1.0"
+    for pier in payload["piers"]:
+        pier.pop("foundation_y_ft")
+    twin = loads_twin(json.dumps(payload))
+    assert twin.schema_version == "1.0"
+    assert all(p.foundation_y_ft is None for p in twin.piers)
